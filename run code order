@@ -1,0 +1,4 @@
+1.运行 Prepare_TrainDataSet/UseOpencvDetectFace.py 制作标注信息 ok
+2. 运行 Prepare_TrainDataSet/GetMiniBatch.py 检车该文件是否能够根据标注信息正确产生训练所需的batch
+3. 写一个计算feature_map尺寸的程序
+4. 写一个计算感受野的程序
