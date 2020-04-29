@@ -37,7 +37,6 @@ class GetMiniBatch:
         self.normalization_constant = [i / 2.0 for i in self.receptive_field_list]
 
 
-
     def PrepareMinibatch(self):
         im_batch = np.zeros((self.batch_size,self.net_input_height,640,self.num_image_channels),dtype=np.float32)
         # [(batch_size, 6, 59, 59), (batch_size,  6, 29, 29),
@@ -345,6 +344,10 @@ class GetMiniBatch:
             data_batch_label.append(label_batch_list[n])
 
         return im_batch,data_batch_mask,data_batch_label
+    # im_batch = [batch_size, img_h, img_w, channels]
+    # bathch_mask = [4] 每一个元素都是mask_batch_list,其中存放这某一个scale下的所有mask,4代表四个scale的mask
+    # mask_batch_list 每一行存储的batch_size个数据，是一个scale下的mask
+    # data_batch_label = [4] 同上
 
     def get_batch_size(self):
         return self.batch_size
