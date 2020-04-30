@@ -2,24 +2,30 @@ import numpy as np
 import tensorflow as tf
 from CFG.config import FLAGS
 from Prepare_TrainDataSet.GetMiniBatch import GetMiniBatch
-
+import tensorflow.contrib.slim as slim
+#slim = tf.contrib.slim
 num_filters_list = [32, 64, 128, 256]
 
 
 def loss_branch(input_data, prefix_name, mask=None, label=None, deploy_flag=False):
-    branch_conv1 = tf.nn.conv2d(input_data, filter=[1,1,num_filters_list[0],num_filters_list[2]],strides=[1,1,1,1],padding='VALID',name=prefix_name + '_1')
-    branch_relu1 = tf.nn.relu(branch_conv1, name='relu_' + prefix_name + '_1')
+    branch_conv1 = slim.conv2d(input_data, num_filters_list[2], [1,1],1,'VALID')
+    # branch_conv1 = tf.nn.conv2d(input_data, filter=[1,1,num_filters_list[0],num_filters_list[2]],strides=[1,1,1,1],padding='VALID',name=prefix_name + '_1')
+    # branch_relu1 = tf.nn.relu(branch_conv1, name='relu_' + prefix_name + '_1')
 
     # face classification，这里是是获得预测人脸概率的特征图
-    branch_conv2_score = tf.nn.conv2d(branch_relu1, filter=[1,1,num_filters_list[2],num_filters_list[2]],strides=[1,1,1,1],padding='VALID',name=prefix_name + '_2_score')
-    branch_relu2_score = tf.nn.relu(branch_conv2_score, name='relu_' + prefix_name + '_2_score')
-    branch_conv3_score = tf.nn.conv2d(branch_relu1, filter=[1,1,num_filters_list[2],2],strides=[1,1,1,1],padding='VALID',name=prefix_name + '_3_score')
+    branch_conv2_score = slim.conv2d(branch_conv1, num_filters_list[2], [1,1],1,'VALID')
+    #branch_conv2_score = tf.nn.conv2d(branch_relu1, filter=[1,1,num_filters_list[2],num_filters_list[2]],strides=[1,1,1,1],padding='VALID',name=prefix_name + '_2_score')
+    #branch_relu2_score = tf.nn.relu(branch_conv2_score, name='relu_' + prefix_name + '_2_score')
+    branch_conv3_score = slim.conv2d(branch_conv2_score, 2 , [1,1],1,'VALID', activation_fn=None)
+    #branch_conv3_score = tf.nn.conv2d(branch_relu1, filter=[1,1,num_filters_list[2],2],strides=[1,1,1,1],padding='VALID',name=prefix_name + '_3_score')
 
-    branch_conv2_bbox = tf.nn.conv2d(branch_relu1, filter=[1, 1, num_filters_list[2], num_filters_list[2]],
-                                      strides=[1, 1, 1, 1], padding='VALID', name=prefix_name + '_2_bbox')
-    branch_relu2_bbox = tf.nn.relu(branch_conv2_score, name='relu_' + prefix_name + '_2_bbox')
-    branch_conv3_bbox = tf.nn.conv2d(branch_relu1, filter=[1, 1, num_filters_list[2], 4], strides=[1, 1, 1, 1],
-                                      padding='VALID', name=prefix_name + '_3_bbox')
+    branch_conv2_bbox = slim.conv2d(branch_conv1, num_filters_list[2], [1,1],1,'VALID')
+    # branch_conv2_bbox = tf.nn.conv2d(branch_relu1, filter=[1, 1, num_filters_list[2], num_filters_list[2]],
+    #                                   strides=[1, 1, 1, 1], padding='VALID', name=prefix_name + '_2_bbox')
+    # branch_relu2_bbox = tf.nn.relu(branch_conv2_score, name='relu_' + prefix_name + '_2_bbox')
+    branch_conv3_bbox = slim.conv2d(branch_conv2_bbox, 4 , [1,1],1,'VALID', activation_fn=None)
+    # branch_conv3_bbox = tf.nn.conv2d(branch_relu1, filter=[1, 1, num_filters_list[2], 4], strides=[1, 1, 1, 1],
+    #                                   padding='VALID', name=prefix_name + '_3_bbox')
 
     if deploy_flag:
         predict_score = tf.nn.softmax(branch_conv3_score,axis=1)
@@ -64,43 +70,55 @@ def loss_branch(input_data, prefix_name, mask=None, label=None, deploy_flag=Fals
         return loss_bbox, loss_score
 
 
-def inference(input,deploy_flag=False):
+def inference(input,masks, labels, deploy_flag=False):
     #480 - 3 + 1 / 2 = 478/2 = 239 不填充
-    conv1 = tf.nn.conv2d(input,[3, 3, 3, num_filters_list[1]],strides=[1,2,2,1],padding='VALID',name='conv1')
-    relu1 = tf.nn.relu(conv1, name='relu1')
+    mask_1 = masks[0]
+    mask_2 = masks[1]
+    mask_3 = masks[2]
+    mask_4 = masks[3]
 
+    label_1 = labels[0]
+    label_2 = labels[1]
+    label_3 = labels[2]
+    label_4 = labels[3]
+#239,239
+    conv1 = slim.conv2d(input,num_filters_list[1], [3,3], 2,'VALID')
+#119,119
     #239 - 3 + 1 / 2 = 237 / 2 = 118.5 = 119
-    conv2 = tf.nn.conv2d(relu1, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 2, 2, 1], padding='VALID', name='conv2')
-    relu2 = tf.nn.relu(conv2, name='relu2')
+    conv2 = slim.conv2d(conv1,num_filters_list[1], [3,3], 2,'VALID')
+
     #59
-    conv3 = tf.nn.conv2d(relu2, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 2, 2, 1], padding='VALID', name='conv3')
-    relu3 = tf.nn.relu(conv2, name='relu3')
+    conv3 = slim.conv2d(conv2,num_filters_list[1], [3,3], 2,'VALID')
 
     # 59/1 = 59
-    conv4 = tf.nn.conv2d(relu3, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1], padding='SAME',name='conv4')
-    relu4 = tf.nn.relu(conv4, name='relu4')
+    conv4 = slim.conv2d(conv3,num_filters_list[1], [3,3], 1,'SAME')
 
-    conv5 = tf.nn.conv2d(relu4, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv5')
-    relu5 = tf.nn.relu(conv5, name='relu5')
 
-    conv6 = tf.nn.conv2d(relu5, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv6')
-    relu6 = tf.nn.relu(conv6, name='relu6')
+    conv5 = slim.conv2d(conv4,num_filters_list[1], [3,3], 1,'SAME')
 
-    conv7 = tf.nn.conv2d(relu6, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv7')
-    relu7 = tf.nn.relu(conv7, name='relu7')
+    conv6 = slim.conv2d(conv5,num_filters_list[1], [3,3], 1,'SAME')
+    # conv6 = tf.nn.conv2d(relu5, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv6')
+    # relu6 = tf.nn.relu(conv6, name='relu6')
 
-    conv8 = tf.nn.conv2d(relu7, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv8')
-    relu8 = tf.nn.relu(conv8, name='relu8')
+    conv7 = slim.conv2d(conv6, num_filters_list[1], [3, 3], 1, 'SAME')
 
-    conv9 = tf.nn.conv2d(relu8, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv9')
-    relu9 = tf.nn.relu(conv9, name='relu9')
+    conv8 = slim.conv2d(conv7, num_filters_list[1], [3, 3], 1, 'SAME')
+    # conv8 = tf.nn.conv2d(relu7, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv8')
+    # relu8 = tf.nn.relu(conv8, name='relu8')
 
-    conv10 = tf.nn.conv2d(relu9, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1], padding='SAME',name='conv10')
-    relu10 = tf.nn.relu(conv10, name='relu10')
+    conv9 = slim.conv2d(conv8, num_filters_list[1], [3, 3], 1, 'SAME')
+    # conv9 = tf.nn.conv2d(relu8, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv9')
+    # relu9 = tf.nn.relu(conv9, name='relu9')
 
-    conv11 = tf.nn.conv2d(relu10, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv11')
-    conv11 = conv11 + conv9
-    relu11 = tf.nn.relu(conv11, name='relu11')
+    conv10 = slim.conv2d(conv9, num_filters_list[1], [3, 3], 1, 'SAME')
+    # conv10 = tf.nn.conv2d(relu9, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1], padding='SAME',name='conv10')
+    # relu10 = tf.nn.relu(conv10, name='relu10')
+
+    conv11 = slim.conv2d(conv10, num_filters_list[1], [3, 3], 1, 'SAME',activation_fn=None)
+    #conv11 = tf.nn.conv2d(relu10, [3, 3, num_filters_list[1], num_filters_list[1]], strides=[1, 1, 1, 1],padding='SAME',name='conv11')
+    conv11 = conv11 + conv9#为什么9有激活
+    relu11 = tf.nn.relu(conv11)
+
     #relu17 shape = [batch_size, 59,59, 32 ]
 
     if deploy_flag:
@@ -109,15 +127,18 @@ def inference(input,deploy_flag=False):
         loss_score_1, loss_bbox_1 = loss_branch(relu11, 'conv11', mask= mask_1, label=label_1)
     #第一个分支结束
 
-    conv12 = tf.nn.conv2d(relu11, [3, 3, num_filters_list[1], num_filters_list[2]], strides=[1,2,2,1], padding='VALID',name='conv12')
-    relu12 = tf.nn.relu(conv12, name='relu12')
+    conv12 = slim.conv2d(relu11, num_filters_list[2], [3, 3], 2, 'VALID')
+    # conv12 = tf.nn.conv2d(relu11, [3, 3, num_filters_list[1], num_filters_list[2]], strides=[1,2,2,1], padding='VALID',name='conv12')
+    # relu12 = tf.nn.relu(conv12, name='relu12')
 
-    conv13 = tf.nn.conv2d(relu12, [3,3,num_filters_list[2], num_filters_list[2]], strides=[1,1,1,1],padding='SAME',name='conv13')
-    relu13 = tf.nn.relu(conv13, name='relu13')
+    conv13 = slim.conv2d(conv12, num_filters_list[2], [3, 3], 1, 'SAME')
+    # conv13 = tf.nn.conv2d(relu12, [3,3,num_filters_list[2], num_filters_list[2]], strides=[1,1,1,1],padding='SAME',name='conv13')
+    # relu13 = tf.nn.relu(conv13, name='relu13')
 
-    conv14 = tf.nn.conv2d(relu13, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],padding='SAME', name='conv14')
+    conv14 = slim.conv2d(conv13, num_filters_list[2], [3, 3], 1, 'SAME',activation_fn=None)
+    #conv14 = tf.nn.conv2d(relu13, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],padding='SAME', name='conv14')
     conv14 = conv14 + conv12
-    relu14 = tf.nn.relu(conv14, name='relu14')
+    relu14 = tf.nn.relu(conv14)
 
     if deploy_flag:
         predict_score_2, predict_bbox_2 = loss_branch(relu14, 'conv14', deploy_flag=deploy_flag)
@@ -125,18 +146,22 @@ def inference(input,deploy_flag=False):
         loss_score_2, loss_bbox_2 = loss_branch(relu14, 'conv14', mask= mask_2, label=label_2)
     #第2个分支结束
 
-    conv15 = tf.nn.conv2d(relu14, [3, 3, num_filters_list[1], num_filters_list[2]], strides=[1, 2, 2, 1],
-                          padding='VALID', name='conv15')
-    relu15 = tf.nn.relu(conv15, name='relu15')
+    conv15 = slim.conv2d(relu14,  num_filters_list[2], [3, 3], 2, 'VALID')
+    # conv15 = tf.nn.conv2d(relu14, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 2, 2, 1],
+    #                       padding='VALID', name='conv15')
+    # relu15 = tf.nn.relu(conv15, name='relu15')
 
-    conv16 = tf.nn.conv2d(relu15, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
-                          padding='SAME', name='conv16')
-    relu16 = tf.nn.relu(conv16, name='relu16')
-
-    conv17 = tf.nn.conv2d(relu16, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
-                          padding='SAME', name='conv17')
+    conv16 = slim.conv2d(conv15,  num_filters_list[2], [3, 3], 1, 'SAME')
+    # conv16 = tf.nn.conv2d(relu15, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
+    #                       padding='SAME', name='conv16')
+    # relu16 = tf.nn.relu(conv16, name='relu16')
+    conv17 = slim.conv2d(conv16, num_filters_list[2], [3, 3], 1, 'SAME', activation_fn=None)
+    # conv17 = tf.nn.conv2d(relu16, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
+    #                       padding='SAME', name='conv17')
     conv17 = conv17 + conv15
-    relu17 = tf.nn.relu(conv17, name='relu17')
+    # relu17 = tf.nn.relu(conv17, name='relu17')
+    relu17 = tf.nn.relu(conv17)
+
 
     if deploy_flag:
         predict_score_3, predict_bbox_3 = loss_branch(relu14, 'conv17', deploy_flag=deploy_flag)
@@ -144,18 +169,21 @@ def inference(input,deploy_flag=False):
         loss_score_3, loss_bbox_3 = loss_branch(relu14, 'conv17', mask=mask_3, label=label_3)
     # 第3个分支结束
 
-    conv18 = tf.nn.conv2d(relu17, [3, 3, num_filters_list[1], num_filters_list[2]], strides=[1, 2, 2, 1],
-                          padding='VALID', name='conv18')
-    relu18 = tf.nn.relu(conv18, name='relu18')
+    conv18 = slim.conv2d(relu17, num_filters_list[2], [3, 3], 2, 'VALID')
+    # conv18 = tf.nn.conv2d(relu17, [3, 3, num_filters_list[1], num_filters_list[2]], strides=[1, 2, 2, 1],
+    #                       padding='VALID', name='conv18')
+    # relu18 = tf.nn.relu(conv18, name='relu18')
 
-    conv19 = tf.nn.conv2d(relu18, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
-                          padding='SAME', name='conv19')
-    relu19 = tf.nn.relu(conv19, name='relu19')
+    conv19 = slim.conv2d(conv18, num_filters_list[2], [3, 3], 1, 'SAME')
+    # conv19 = tf.nn.conv2d(relu18, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
+    #                       padding='SAME', name='conv19')
+    # relu19 = tf.nn.relu(conv19, name='relu19')
 
-    conv20 = tf.nn.conv2d(relu19, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
-                          padding='SAME', name='conv20')
+    conv20 = slim.conv2d(conv19, num_filters_list[2], [3, 3], 1, 'SAME',activation_fn=None)
+    # conv20 = tf.nn.conv2d(relu19, [3, 3, num_filters_list[2], num_filters_list[2]], strides=[1, 1, 1, 1],
+    #                       padding='SAME', name='conv20')
     conv20 = conv20 + conv18
-    relu20 = tf.nn.relu(conv20, name='relu14')
+    relu20 = tf.nn.relu(conv20)
 
     if deploy_flag:
         predict_score_4, predict_bbox_4 = loss_branch(relu20, 'conv20', deploy_flag=deploy_flag)
@@ -174,8 +202,12 @@ def inference(input,deploy_flag=False):
                         loss_score_2, loss_bbox_2,
                         loss_score_3, loss_bbox_3,
                         loss_score_4, loss_bbox_4)
+        total_loss = loss_score_1 + loss_bbox_1 + \
+                     loss_score_2 + loss_bbox_2 + \
+                     loss_score_3 + loss_bbox_3 + \
+                     loss_score_4 + loss_bbox_4
 
-        return net #, data_names, label_names
+        return total_loss #net, data_names, label_names
 
 
 if __name__ == '__main__':
@@ -204,17 +236,27 @@ if __name__ == '__main__':
 
     MiniBatch = GetMiniBatch()
     img_batch , mask_batch, label_batch = MiniBatch.PrepareMinibatch()
+    #img_batch = np.reshape(img_batch,[16,480,480,3])
+
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    total_loss = inference(img_batch, mask_batch, label_batch)
+    optimizer  = tf.train.AdamOptimizer(0.001)
+    train_op   = optimizer.minimize(total_loss)
+    step = 0
+    with tf.Session() as sess:
+        init_op = tf.global_variables_initializer()
+        sess.run(init_op)
 
 
+        while step < 1000:
 
-
-
-
-
-
-
-
-
+            _, sum_loss = sess.run([train_op,total_loss], feed_dict={tf_img_batch:img_batch[0],
+                                      tf_mask1_batch: mask_batch[0],  tf_mask2_batch:mask_batch[1], \
+                                      tf_mask3_batch: mask_batch[2], tf_mask4_batch: mask_batch[3], \
+                                      tf_label1_batch: label_batch[0], tf_label2_batch: label_batch[1], \
+                                      tf_label3_batch: label_batch[2], tf_label4_batch: label_batch[3], \
+                                      })
+            print('Total Loss : ',sum_loss)
 
 
 
