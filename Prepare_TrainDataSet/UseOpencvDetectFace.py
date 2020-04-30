@@ -3,6 +3,7 @@ import csv
 import os
 import os.path as osp
 face_casecade = cv2.CascadeClassifier('/home/gc/PycharmProjects/GC_LFFD/haarcascade_frontalface_default.xml')
+resize_dir = r"/home/gc/Dataset/resize_oneface"
 def StaticDetect(filename):
     '''
     静态图像的人脸检测
@@ -14,6 +15,7 @@ def StaticDetect(filename):
     # 加载图像
 
     img = cv2.imread(filename, cv2.IMREAD_COLOR)
+    img = cv2.resize(img,(480,480))
     # 转换为灰度图像
     gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     '''
@@ -30,6 +32,8 @@ def StaticDetect(filename):
     faces = face_casecade.detectMultiScale(gray_img, 1.2, 5)
     if len(faces) > 0:
         for (x, y, w, h) in faces:
+            img_dir, img_name = os.path.split(filename)
+            cv2.imwrite(osp.join(resize_dir,img_name),img)
             img = cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
         # cv2.namedWindow('Face_Detected')
         # cv2.imshow('Face_Detected', img)
@@ -58,6 +62,7 @@ def getAllImgPath(dirName,csvName):
                 fullImgPath = osp.join(dirName, filename, imgName)
                 result ,x,y,w,h = StaticDetect(fullImgPath)
                 if result:
+                    fullImgPath = osp.join(resize_dir, imgName)
                     files.writerow([fullImgPath, x,y,w,h])
         cvsfile.close()
 

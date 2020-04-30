@@ -38,7 +38,7 @@ class GetMiniBatch:
 
 
     def PrepareMinibatch(self):
-        im_batch = np.zeros((self.batch_size,self.net_input_height,640,self.num_image_channels),dtype=np.float32)
+        im_batch = np.zeros((self.batch_size,self.net_input_height,self.net_input_weight,self.num_image_channels),dtype=np.float32)
         # [(batch_size, 6, 59, 59), (batch_size,  6, 29, 29),
         # (batch_size,, 6, 14, 14), (batch_size,  6, 6, 6)]
         label_batch_list = [np.zeros((self.batch_size,self.num_output_channels,v,v), dtype=np.float32) \
